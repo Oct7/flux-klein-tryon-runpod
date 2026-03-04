@@ -1,0 +1,15 @@
+# RunPod 전용 requirements
+# torch/torchvision/torchaudio는 base 이미지(pytorch/pytorch)에 포함
+# Flux2KleinPipeline은 PyPI 미릴리즈 — main 브랜치에서 직접 설치 필요
+git+https://github.com/huggingface/diffusers.git
+transformers>=4.47.0
+accelerate>=0.34.0
+safetensors
+sentencepiece
+tiktoken
+psutil
+requests
+peft
+Pillow
+huggingface_hub
+hf_transfer
