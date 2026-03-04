@@ -10,20 +10,11 @@ from PIL import Image
 from diffusers import Flux2KleinPipeline
 import runpod
 
-# HuggingFace 인증 (gated model 접근)
-hf_token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_HUB_TOKEN")
-if hf_token:
-    try:
-        from huggingface_hub import login
-        login(token=hf_token)
-        print(f"HuggingFace logged in successfully")
-    except Exception as e:
-        print(f"HuggingFace login warning: {e}")
-
-# 글로벌 파이프라인 (첫 요청 시 lazy 로드)
+# 글로벌 파이프라인 (워커 시작 시 1회 로드)
 pipe = None
 
 # RunPod Network Volume 마운트 경로 (없으면 HuggingFace 기본 캐시 사용)
+# 콘솔에서 Volume을 /runpod-volume 로 마운트하면 자동으로 사용됨
 _VOLUME_PATH = "/runpod-volume/models"
 if os.path.isdir("/runpod-volume"):
     os.environ.setdefault("HF_HOME", _VOLUME_PATH)
@@ -34,11 +25,12 @@ LOAD_RETRY_DELAY = 10
 
 
 def load_model():
-    """모델 + LoRA 로드 (첫 요청 시 1회 실행, 실패 시 최대 3회 재시도)"""
-    global pipe
-    if pipe is not None:
-        return  # 이미 로드됨
+    """모델 + LoRA 로드 (워커 시작 시 1회 실행, 실패 시 최대 3회 재시도)
 
+    - Network Volume 마운트 시: /runpod-volume/models 캐시 사용 (빠름)
+    - Volume 없을 시: HF_HOME 또는 기본 캐시 사용
+    """
+    global pipe
     print(f"HF_HOME: {os.environ.get('HF_HOME', '~/.cache/huggingface')}")
 
     for attempt in range(1, MAX_LOAD_RETRIES + 1):
@@ -78,11 +70,14 @@ def cleanup_gpu():
 def load_image(src: str) -> Image.Image:
     """base64 또는 URL에서 PIL Image를 로드합니다."""
     if src.startswith("data:"):
+        # data:image/...;base64,<data>
         b64_data = src.split(",", 1)[1]
         img_bytes = base64.b64decode(b64_data)
     elif not src.startswith("http://") and not src.startswith("https://"):
+        # 순수 base64 문자열
         img_bytes = base64.b64decode(src)
     else:
+        # URL 다운로드
         response = requests.get(src, timeout=30)
         response.raise_for_status()
         img_bytes = response.content
@@ -103,10 +98,15 @@ def handler(job):
         lora_scale      : float      — LoRA 가중치 (기본 1.0)
         seed            : int        — -1=랜덤 (기본 -1)
         upload_url      : str|null   — S3 presigned URL (선택)
+
+    Output:
+        {"image_base64": "data:image/png;base64,...", "seed": int}
+        또는 upload_url 지정 시:
+        {"image_url": "https://...", "seed": int}
     """
     job_input = job["input"]
 
-    # ---- 입력 검증 ----
+    # ---- 입력 검증 — raise로 RunPod FAILED 처리 ----
     person_image_src = job_input.get("person_image")
     if not person_image_src:
         raise ValueError("person_image is required (base64 or URL)")
@@ -118,9 +118,6 @@ def handler(job):
         or len(garment_images_src) == 0
     ):
         raise ValueError("garment_images is required and must be a non-empty list")
-
-    # ---- 모델 lazy 로드 ----
-    load_model()
 
     # ---- 파라미터 파싱 ----
     prompt = job_input.get("prompt", "TRYON a person wearing the outfit")
@@ -161,6 +158,7 @@ def handler(job):
         result_image.save(img_io, format="PNG")
         img_bytes = img_io.getvalue()
 
+        # S3 presigned URL 업로드 (선택)
         if upload_url:
             upload_res = requests.put(
                 upload_url,
@@ -172,6 +170,7 @@ def handler(job):
             pure_url = upload_url.split("?")[0]
             return {"image_url": pure_url, "seed": seed}
 
+        # base64 반환 (기본)
         encoded = base64.b64encode(img_bytes).decode("utf-8")
         return {
             "image_base64": f"data:image/png;base64,{encoded}",
@@ -180,11 +179,12 @@ def handler(job):
 
     except Exception as e:
         print(f"Handler error: {traceback.format_exc()}")
-        raise
+        raise  # RunPod가 FAILED로 처리
 
     finally:
         cleanup_gpu()
 
 
-# 서버리스 루프 시작 (모델은 첫 요청 시 lazy 로드)
+# 워커 시작 시 모델 로드 후 서버리스 루프 진입
+load_model()
 runpod.serverless.start({"handler": handler})

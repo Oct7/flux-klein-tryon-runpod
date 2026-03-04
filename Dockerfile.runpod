@@ -1,12 +1,10 @@
-# RunPod 서버리스 전용 Dockerfile (런타임 모델 다운로드)
-# 베이스: 공식 PyTorch 이미지 (CUDA 12.1 + cuDNN 9, runtime)
+# RunPod 서버리스 전용 Dockerfile (모델 빌드타임 베이킹)
 FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_PREFER_BINARY=1
 ENV PYTHONUNBUFFERED=1
 
-# 시스템 의존성 + libtcmalloc (메모리 관리 최적화)
 RUN apt-get update && apt-get install -y \
     git wget libgoogle-perftools-dev \
     && apt-get autoremove -y && apt-get clean -y \
@@ -14,23 +12,24 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# hf_transfer — HuggingFace 고속 다운로드
+ARG HF_TOKEN=""
+ENV HF_TOKEN=${HF_TOKEN}
+
 RUN pip install --no-cache-dir hf_transfer
 ENV HF_HUB_ENABLE_HF_TRANSFER=1
 
-# Python 의존성
 COPY requirements-runpod.txt .
 RUN pip install --no-cache-dir -r requirements-runpod.txt && \
     pip install --no-cache-dir runpod
 
-# 소스 복사
 COPY download_model.py .
 COPY runpod_app.py .
 COPY start.sh .
 RUN chmod +x start.sh
 
-# 모델 캐시 디렉토리 (Network Volume 또는 컨테이너 로컬)
 ENV HF_HOME=/app/model_cache
-RUN mkdir -p /app/model_cache
+RUN mkdir -p /app/model_cache && python download_model.py
+
+ENV HF_TOKEN=""
 
 CMD ["/app/start.sh"]
