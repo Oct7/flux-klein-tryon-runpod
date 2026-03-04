@@ -14,7 +14,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: oct7/flux-klein-tryon
+  IMAGE_NAME: oct7/flux-klein-tryon-runpod
 
 jobs:
   build-and-push:
