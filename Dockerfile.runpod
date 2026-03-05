@@ -1,15 +1,18 @@
 # RunPod 서버리스 전용 Dockerfile
 # 모델은 빌드타임 베이킹 없이 런타임에 다운로드 (Network Volume 캐시 활용)
-# 베이스: 공식 PyTorch 이미지 (CUDA 12.1 + cuDNN 9, runtime — diffusers는 순수 Python)
-FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime
+# 베이스: nvidia/cuda 경량 이미지 (~1.5GB) — pytorch/pytorch(~8GB) 대비 CI 디스크 절약
+FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_PREFER_BINARY=1
 ENV PYTHONUNBUFFERED=1
 
-# 시스템 의존성 + libtcmalloc (메모리 관리 최적화)
+# Python 3.10 + 시스템 의존성 + libtcmalloc
 RUN apt-get update && apt-get install -y \
+    python3.10 python3.10-dev python3-pip \
     git wget libgoogle-perftools-dev \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python3 \
+    && ln -sf /usr/bin/python3 /usr/bin/python \
     && apt-get autoremove -y && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
 
@@ -18,6 +21,11 @@ WORKDIR /app
 # HF_TOKEN (런타임 모델 다운로드용 — 빌드 시 불필요)
 ARG HF_TOKEN=""
 ENV HF_TOKEN=${HF_TOKEN}
+
+# PyTorch 2.5.1 + CUDA 12.1 휠 설치
+RUN pip install --no-cache-dir \
+    torch==2.5.1 torchvision torchaudio \
+    --index-url https://download.pytorch.org/whl/cu121
 
 # hf_transfer — HuggingFace 고속 다운로드
 RUN pip install --no-cache-dir hf_transfer
