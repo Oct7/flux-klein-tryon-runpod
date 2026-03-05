@@ -27,7 +27,7 @@ jobs:
       - name: Maximize build space
         uses: easimon/maximize-build-space@master
         with:
-          root-reserve-mb: 512
+          root-reserve-mb: 4096
           swap-size-mb: 1024
           remove-dotnet: 'true'
           remove-android: 'true'
@@ -41,6 +41,15 @@ jobs:
           sudo rm -rf /usr/local/share/powershell /usr/local/share/chromium
           sudo rm -rf /usr/local/lib/node_modules
           sudo apt-get autoremove -y && sudo apt-get clean
+          df -h
+
+      - name: Move Docker data root to expanded volume
+        run: |
+          sudo systemctl stop docker
+          sudo mkdir -p /home/runner/work/docker-data
+          echo '{"data-root": "/home/runner/work/docker-data"}' | sudo tee /etc/docker/daemon.json
+          sudo systemctl start docker
+          sudo docker info | grep "Docker Root Dir"
           df -h
 
       - name: Checkout repository
@@ -66,4 +75,5 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           build-args: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
-          no-cache: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
