@@ -1,7 +1,7 @@
 # FLUX.2-Klein Virtual Try-On API
 
 FLUX.2-klein-9B (fp8) + Virtual Try-On LoRA 기반의 I2I(Image-to-Image) FastAPI 서버입니다.
-사람 이미지 + 상의 + 하의 3장을 입력하면 가상 피팅 합성 이미지를 반환합니다.
+사람 이미지 + 상의 + 하의 3장을 입력하면 가상 피팅 합성 이미지를 반환합니다
 
 ## 모델 정보
 
