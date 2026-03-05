@@ -8,7 +8,16 @@ import torch
 import requests
 from PIL import Image
 from diffusers import Flux2KleinPipeline
+from huggingface_hub import login as hf_login
 import runpod
+
+# HuggingFace 인증 (게이티드 모델 접근용)
+_hf_token = os.environ.get("HF_TOKEN")
+if _hf_token:
+    hf_login(token=_hf_token)
+    print("HuggingFace logged in successfully")
+else:
+    print("WARNING: HF_TOKEN not set — gated models will fail")
 
 # 글로벌 파이프라인 (워커 시작 시 1회 로드)
 pipe = None
