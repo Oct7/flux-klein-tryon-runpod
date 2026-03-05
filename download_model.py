@@ -9,9 +9,9 @@ os.environ["HF_HOME"] = hf_home
 os.makedirs(hf_home, exist_ok=True)
 
 try:
-    print("Downloading and caching FLUX.2-klein-9b-fp8 base model...")
+    print("Downloading and caching FLUX.2-klein-9B base model...")
     pipe = Flux2KleinPipeline.from_pretrained(
-        "black-forest-labs/FLUX.2-klein-9b-fp8",
+        "black-forest-labs/FLUX.2-klein-9B",
         torch_dtype=torch.bfloat16,
         low_cpu_mem_usage=False,
     )

@@ -37,7 +37,7 @@ def load_model():
         try:
             print(f"Loading FLUX.2-Klein pipeline... (attempt {attempt}/{MAX_LOAD_RETRIES})")
             pipe = Flux2KleinPipeline.from_pretrained(
-                "black-forest-labs/FLUX.2-klein-9b-fp8",
+                "black-forest-labs/FLUX.2-klein-9B",
                 torch_dtype=torch.bfloat16,
                 low_cpu_mem_usage=False,
             ).to("cuda")
