@@ -157,7 +157,6 @@ def handler(job):
             width=width,
             num_inference_steps=num_inference_steps,
             guidance_scale=guidance_scale,
-            joint_attention_kwargs={"scale": lora_scale},
             generator=generator,
         )
         result_image = output.images[0]
